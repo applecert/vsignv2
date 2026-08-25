@@ -104,14 +104,14 @@ public class ContainerBridge {
             var containerPath = info["container"] as? String ?? ""
             if containerPath.isEmpty {
                 var lookupError: NSString?
-                if let resolved = MCMActivateContainerPath(2, bundleID as NSString, false, &lookupError) as String?,
+                if let resolved = MCMActivateContainerPath(2, bundleID, false, &lookupError) as String?,
                    !resolved.isEmpty {
                     containerPath = resolved
                 }
             }
 
             var iconBase64 = ""
-            if let img = iconForBundleID(bundleID as NSString),
+            if let img = iconForBundleID(bundleID),
                let pngData = img.pngData() {
                 iconBase64 = "data:image/png;base64," + pngData.base64EncodedString()
             }
@@ -130,23 +130,23 @@ public class ContainerBridge {
 
         // 2. SECONDARY: MCM Class-2 Enumeration (MobileContainerManager)
         var enumError: NSString?
-        let mcmIdentifiers = (MCMEnumerateIdentifiersForClass(2, 1024, &enumError) as? [String]) ?? []
+        let mcmIdentifiers = MCMEnumerateIdentifiersForClass(2, 1024, &enumError)
         for bundleID in mcmIdentifiers {
             if appMap[bundleID] != nil && !(appMap[bundleID]?["containerPath"] as? String ?? "").isEmpty {
                 continue
             }
             var lookupError: NSString?
-            guard let containerPath = MCMActivateContainerPath(2, bundleID as NSString, false, &lookupError) as String?,
+            guard let containerPath = MCMActivateContainerPath(2, bundleID, false, &lookupError) as String?,
                   !containerPath.isEmpty else {
                 continue
             }
 
-            let singleInfo = appInfoForBundleID(bundleID as NSString) as? [String: Any] ?? [:]
+            let singleInfo = appInfoForBundleID(bundleID) as? [String: Any] ?? [:]
             let appName = (singleInfo["name"] as? String) ?? bundleID
             let version = (singleInfo["version"] as? String) ?? ""
 
             var iconBase64 = ""
-            if let img = iconForBundleID(bundleID as NSString),
+            if let img = iconForBundleID(bundleID),
                let pngData = img.pngData() {
                 iconBase64 = "data:image/png;base64," + pngData.base64EncodedString()
             }
@@ -181,17 +181,17 @@ public class ContainerBridge {
                 bundleID = "com.apple.container." + String(uuid.prefix(8))
                 appName = "App " + String(uuid.prefix(6))
             } else if appName.isEmpty {
-                let singleInfo = appInfoForBundleID(bundleID as NSString) as? [String: Any] ?? [:]
+                let singleInfo = appInfoForBundleID(bundleID) as? [String: Any] ?? [:]
                 appName = (singleInfo["name"] as? String) ?? bundleID
             }
 
             var iconBase64 = ""
-            if let img = iconForBundleID(bundleID as NSString),
+            if let img = iconForBundleID(bundleID),
                let pngData = img.pngData() {
                 iconBase64 = "data:image/png;base64," + pngData.base64EncodedString()
             }
 
-            let singleInfo = appInfoForBundleID(bundleID as NSString) as? [String: Any] ?? [:]
+            let singleInfo = appInfoForBundleID(bundleID) as? [String: Any] ?? [:]
             let version = singleInfo["version"] as? String ?? ""
 
             appMap[bundleID] = [

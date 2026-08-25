@@ -274,7 +274,7 @@ public class IpaSignerModule: Module {
     }
 
     AsyncFunction("openInstalledApp") { (bundleId: String, promise: Promise) in
-      let result = openApplicationForBundleID(bundleId as NSString)
+      let result = openApplicationForBundleID(bundleId)
       promise.resolve(result)
     }
   }
