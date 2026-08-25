@@ -273,6 +273,26 @@ public class IpaSignerModule: Module {
       }
     }
 
+    AsyncFunction("getContainerStorageBreakdown") { (containerPath: String, promise: Promise) in
+      let clean = cleanPath(containerPath)
+      DispatchQueue.global(qos: .userInitiated).async {
+        let breakdown = ContainerBridge.getContainerStorageBreakdown(containerPath: clean)
+        DispatchQueue.main.async {
+          promise.resolve(breakdown)
+        }
+      }
+    }
+
+    AsyncFunction("createContainerDirectory") { (path: String, promise: Promise) in
+      let clean = cleanPath(path)
+      DispatchQueue.global(qos: .userInitiated).async {
+        let success = ContainerBridge.createDirectory(at: clean)
+        DispatchQueue.main.async {
+          promise.resolve(success)
+        }
+      }
+    }
+
     AsyncFunction("openInstalledApp") { (bundleId: String, promise: Promise) in
       let result = openApplicationForBundleID(bundleId)
       promise.resolve(result)

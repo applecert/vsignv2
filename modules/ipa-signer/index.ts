@@ -27,6 +27,15 @@ export interface ContainerFileItem {
   modified: number;
 }
 
+export interface ContainerStorageBreakdown {
+  caches: number;
+  webkit: number;
+  splashboard: number;
+  tmp: number;
+  documents: number;
+  total: number;
+}
+
 // ==================== BACKGROUND TASK ====================
 export async function startBackgroundTask(): Promise<boolean> {
   const native = getIpaSigner();
@@ -143,6 +152,32 @@ export async function deleteContainerItem(path: string): Promise<boolean> {
     throw new Error('Lõi Native IpaSigner không khả dụng trong Expo Go.');
   }
   return await native.deleteContainerItem(path);
+}
+
+// Tạo thư mục mới
+export async function createContainerDirectory(path: string): Promise<boolean> {
+  const native = getIpaSigner();
+  if (!native) {
+    throw new Error('Lõi Native IpaSigner không khả dụng trong Expo Go.');
+  }
+  try {
+    return await native.createContainerDirectory(path);
+  } catch {
+    return false;
+  }
+}
+
+// Phân tích chi tiết dung lượng container (Caches, WebKit, SplashBoard, tmp, Docs)
+export async function getContainerStorageBreakdown(containerPath: string): Promise<ContainerStorageBreakdown> {
+  const native = getIpaSigner();
+  if (!native) {
+    return { caches: 0, webkit: 0, splashboard: 0, tmp: 0, documents: 0, total: 0 };
+  }
+  try {
+    return await native.getContainerStorageBreakdown(containerPath);
+  } catch {
+    return { caches: 0, webkit: 0, splashboard: 0, tmp: 0, documents: 0, total: 0 };
+  }
 }
 
 // Dọn dẹp cache rác của app
