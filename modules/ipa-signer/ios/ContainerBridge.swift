@@ -14,6 +14,9 @@ func bad_query_release(_ handle: Int64)
 @_silgen_name("MCMActivateContainerPath")
 func MCMActivateContainerPath(_ cls: UInt64, _ identifier: NSString, _ group: Bool, _ error: AutoreleasingUnsafeMutablePointer<NSString?>?) -> NSString?
 
+@_silgen_name("MCMEnumerateIdentifiersForClass")
+func MCMEnumerateIdentifiersForClass(_ cls: UInt64, _ limit: UInt, _ error: AutoreleasingUnsafeMutablePointer<NSString?>?) -> NSArray
+
 @_silgen_name("installedAppInfo")
 func installedAppInfo() -> NSDictionary
 
@@ -29,6 +32,7 @@ func openApplicationForBundleID(_ bundleID: NSString) -> Bool
 // MARK: - Container Bridge Manager
 public class ContainerBridge {
     static let appDataRoot = "/var/mobile/Containers/Data/Application"
+    private static let cacheKey = "VSign_ResolvedAppsCache_v2"
 
     public static func grantContainerAccess(_ path: String) -> Int64 {
         let clean = path.hasSuffix("/") ? String(path.dropLast()) : path
@@ -78,62 +82,165 @@ public class ContainerBridge {
         }
         if data == nil { data = try? Data(contentsOf: URL(fileURLWithPath: metaPath)) }
 
-        guard let validData = data,
-              let plist = try? PropertyListSerialization.propertyList(from: validData, options: [], format: nil) as? [String: Any] else {
-            return nil
+        if let validData = data,
+           let plist = try? PropertyListSerialization.propertyList(from: validData, options: [], format: nil) as? [String: Any] {
+            let bundleID = plist["MCMMetadataIdentifier"] as? String ?? ""
+            var name = ""
+            if let info = plist["MCMMetadataInfo"] as? [String: Any] {
+                name = (info["CFBundleDisplayName"] as? String) ?? (info["CFBundleName"] as? String) ?? ""
+            }
+            if !bundleID.isEmpty {
+                return (bundleID, name)
+            }
         }
 
-        let bundleID = plist["MCMMetadataIdentifier"] as? String ?? ""
-        var name = ""
-        if let info = plist["MCMMetadataInfo"] as? [String: Any] {
-            name = (info["CFBundleDisplayName"] as? String) ?? (info["CFBundleName"] as? String) ?? ""
+        // Fallback 1: inspect Library/Preferences/*.plist for the bundle identifier
+        let prefsDir = (containerPath as NSString).appendingPathComponent("Library/Preferences")
+        if let prefFiles = try? FileManager.default.contentsOfDirectory(atPath: prefsDir) {
+            for file in prefFiles where file.hasSuffix(".plist") && !file.hasPrefix(".") && !file.hasPrefix("com.apple.") {
+                let candidateID = String(file.dropLast(".plist".count))
+                if candidateID.contains(".") && candidateID.count > 4 {
+                    return (candidateID, "")
+                }
+            }
+            for file in prefFiles where file.hasSuffix(".plist") && !file.hasPrefix(".") {
+                let candidateID = String(file.dropLast(".plist".count))
+                if candidateID.contains(".") && candidateID.count > 4 {
+                    return (candidateID, "")
+                }
+            }
         }
-        return (bundleID, name)
+
+        // Fallback 2: inspect Library/Saved Application State/*.savedState
+        let stateDir = (containerPath as NSString).appendingPathComponent("Library/Saved Application State")
+        if let stateFiles = try? FileManager.default.contentsOfDirectory(atPath: stateDir) {
+            for file in stateFiles where file.hasSuffix(".savedState") {
+                let candidateID = String(file.dropLast(".savedState".count))
+                if candidateID.contains(".") {
+                    return (candidateID, "")
+                }
+            }
+        }
+
+        return nil
     }
 
     public static func getInstalledApps() -> [[String: Any]] {
-        let containerDirs = enumerateRootContainers()
-        var results: [[String: Any]] = []
+        var appMap: [String: [String: Any]] = [:]
 
-        for dir in containerDirs {
-            let uuid = (dir as NSString).lastPathComponent
-            guard UUID(uuidString: uuid) != nil else { continue }
-
-            var bundleID = uuid
-            var appName = "Container " + String(uuid.prefix(6))
-            var version = ""
-            var iconBase64 = ""
-
-            if let meta = readMetadata(at: dir) {
-                let cleanID = meta.bundleID.trimmingCharacters(in: .whitespacesAndNewlines)
-                if !cleanID.isEmpty {
-                    bundleID = cleanID
-                    let rawInfo = appInfoForBundleID(cleanID as NSString) as? [String: Any] ?? [:]
-                    appName = meta.name.isEmpty ? (rawInfo["name"] as? String ?? cleanID) : meta.name
-                    version = rawInfo["version"] as? String ?? ""
+        // 1. PRIMARY: Query LaunchServices & MobileInstallation
+        let rawInfo = installedAppInfo() as? [String: [String: Any]] ?? [:]
+        for (bundleID, info) in rawInfo {
+            var containerPath = info["container"] as? String ?? ""
+            if containerPath.isEmpty {
+                var lookupError: NSString?
+                if let resolved = MCMActivateContainerPath(2, bundleID as NSString, false, &lookupError) as String?,
+                   !resolved.isEmpty {
+                    containerPath = resolved
                 }
             }
 
+            var iconBase64 = ""
             if let img = iconForBundleID(bundleID as NSString),
                let pngData = img.pngData() {
                 iconBase64 = "data:image/png;base64," + pngData.base64EncodedString()
             }
 
-            results.append([
+            let appName = info["name"] as? String ?? bundleID
+            let version = info["version"] as? String ?? ""
+
+            appMap[bundleID] = [
+                "bundleId": bundleID,
+                "name": appName,
+                "containerPath": containerPath,
+                "version": version,
+                "icon": iconBase64
+            ]
+        }
+
+        // 2. SECONDARY: MCM Class-2 Enumeration (MobileContainerManager)
+        var enumError: NSString?
+        let mcmIdentifiers = (MCMEnumerateIdentifiersForClass(2, 1024, &enumError) as? [String]) ?? []
+        for bundleID in mcmIdentifiers {
+            if appMap[bundleID] != nil && !(appMap[bundleID]?["containerPath"] as? String ?? "").isEmpty {
+                continue
+            }
+            var lookupError: NSString?
+            guard let containerPath = MCMActivateContainerPath(2, bundleID as NSString, false, &lookupError) as String?,
+                  !containerPath.isEmpty else {
+                continue
+            }
+
+            let singleInfo = appInfoForBundleID(bundleID as NSString) as? [String: Any] ?? [:]
+            let appName = (singleInfo["name"] as? String) ?? bundleID
+            let version = (singleInfo["version"] as? String) ?? ""
+
+            var iconBase64 = ""
+            if let img = iconForBundleID(bundleID as NSString),
+               let pngData = img.pngData() {
+                iconBase64 = "data:image/png;base64," + pngData.base64EncodedString()
+            }
+
+            appMap[bundleID] = [
+                "bundleId": bundleID,
+                "name": appName,
+                "containerPath": containerPath,
+                "version": version,
+                "icon": iconBase64
+            ]
+        }
+
+        // 3. TERTIARY: Physical Inode Root Enumeration & Metadata inspection
+        let containerDirs = enumerateRootContainers()
+        for dir in containerDirs {
+            let uuid = (dir as NSString).lastPathComponent
+            guard UUID(uuidString: uuid) != nil else { continue }
+
+            // Check if any known app already maps to this container directory
+            let alreadyMapped = appMap.values.contains { ($0["containerPath"] as? String ?? "") == dir }
+            if alreadyMapped { continue }
+
+            var bundleID = ""
+            var appName = ""
+            if let meta = readMetadata(at: dir) {
+                bundleID = meta.bundleID.trimmingCharacters(in: .whitespacesAndNewlines)
+                appName = meta.name
+            }
+
+            if bundleID.isEmpty {
+                bundleID = "com.apple.container." + String(uuid.prefix(8))
+                appName = "App " + String(uuid.prefix(6))
+            } else if appName.isEmpty {
+                let singleInfo = appInfoForBundleID(bundleID as NSString) as? [String: Any] ?? [:]
+                appName = (singleInfo["name"] as? String) ?? bundleID
+            }
+
+            var iconBase64 = ""
+            if let img = iconForBundleID(bundleID as NSString),
+               let pngData = img.pngData() {
+                iconBase64 = "data:image/png;base64," + pngData.base64EncodedString()
+            }
+
+            let singleInfo = appInfoForBundleID(bundleID as NSString) as? [String: Any] ?? [:]
+            let version = singleInfo["version"] as? String ?? ""
+
+            appMap[bundleID] = [
                 "bundleId": bundleID,
                 "name": appName,
                 "containerPath": dir,
                 "version": version,
                 "icon": iconBase64
-            ])
+            ]
         }
 
-        results.sort {
+        // Filter out entries without a usable container path if user wants to browse
+        let finalResults = Array(appMap.values).sorted {
             let n1 = $0["name"] as? String ?? ""
             let n2 = $1["name"] as? String ?? ""
             return n1.localizedCaseInsensitiveCompare(n2) == .orderedAscending
         }
-        return results
+
+        return finalResults
     }
 
     public static func listDirectory(at path: String) -> [[String: Any]] {

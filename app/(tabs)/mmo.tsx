@@ -13,7 +13,6 @@ import {
   FlatList,
   Image,
   Animated,
-  DeviceEventEmitter,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -25,7 +24,6 @@ import JSZip from 'jszip';
 import {
   Folder,
   FolderTree,
-  FolderOpen,
   Trash2,
   Play,
   RefreshCw,
@@ -34,18 +32,15 @@ import {
   HardDrive,
   ShieldCheck,
   Zap,
-  Package,
   Sparkles,
-  Download,
-  Upload,
-  FileCode,
-  CheckCircle2,
-  ArrowUpRight,
-  Cpu,
-  Layers,
   FileArchive,
+  Gamepad2,
+  Layers,
+  Cpu,
+  CheckCircle2,
+  Smartphone,
   Sliders,
-  Info,
+  Filter,
 } from 'lucide-react-native';
 import {
   getInstalledAppContainers,
@@ -61,28 +56,25 @@ import { TabTransition } from '../../components/ui/TabTransition';
 
 const { width } = Dimensions.get('window');
 
-type ActiveSection = 'apps' | 'cleaner' | 'mod' | 'backup';
+type FilterCategory = 'all' | 'user' | 'games' | 'system';
 
 export default function AppManagerTabScreen() {
   const router = useRouter();
   useThemeUpdate();
   const isLight = COLORS.background === '#F4F4F6';
 
-  const [activeSection, setActiveSection] = useState<ActiveSection>('apps');
   const [apps, setApps] = useState<AppContainerInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchText, setSearchText] = useState('');
+  const [category, setCategory] = useState<FilterCategory>('all');
   const [cleaningId, setCleaningId] = useState<string | null>(null);
   const [totalFreedMB, setTotalFreedMB] = useState<number>(0);
   const [isCleaningAll, setIsCleaningAll] = useState(false);
 
-  // Mod injection state
-  const [selectedAppForMod, setSelectedAppForMod] = useState<AppContainerInfo | null>(null);
-  const [isInjectingMod, setIsInjectingMod] = useState(false);
-
-  // Backup state
+  // Backup & Mod state
   const [backingUpId, setBackingUpId] = useState<string | null>(null);
+  const [isInjectingMod, setIsInjectingMod] = useState(false);
 
   const loadApps = useCallback(async (isPull = false) => {
     if (isPull) setRefreshing(true);
@@ -104,9 +96,37 @@ export default function AppManagerTabScreen() {
   }, [loadApps]);
 
   const filteredApps = apps.filter((app) => {
-    if (!searchText) return true;
-    const q = searchText.toLowerCase();
-    return app.name.toLowerCase().includes(q) || app.bundleId.toLowerCase().includes(q);
+    // 1. Text Search Filter
+    if (searchText) {
+      const q = searchText.toLowerCase();
+      const matchName = app.name.toLowerCase().includes(q);
+      const matchBundle = app.bundleId.toLowerCase().includes(q);
+      if (!matchName && !matchBundle) return false;
+    }
+
+    // 2. Category Filter
+    if (category === 'all') return true;
+    const lowerId = app.bundleId.toLowerCase();
+    const lowerName = app.name.toLowerCase();
+
+    if (category === 'system') {
+      return lowerId.startsWith('com.apple.') || lowerId.includes('system');
+    }
+    if (category === 'games') {
+      return (
+        lowerId.includes('game') ||
+        lowerId.includes('play') ||
+        lowerName.includes('game') ||
+        lowerId.includes('vng') ||
+        lowerId.includes('garena') ||
+        lowerId.includes('roblox') ||
+        lowerId.includes('genshin')
+      );
+    }
+    if (category === 'user') {
+      return !lowerId.startsWith('com.apple.');
+    }
+    return true;
   });
 
   const handleOpenBrowser = (app: AppContainerInfo) => {
@@ -291,7 +311,7 @@ export default function AppManagerTabScreen() {
         style={[
           styles.appCard,
           {
-            backgroundColor: isLight ? '#FFFFFF' : 'rgba(18, 24, 38, 0.75)',
+            backgroundColor: isLight ? '#FFFFFF' : '#0B1120',
             borderColor: isLight ? '#E2E8F0' : 'rgba(255, 255, 255, 0.08)',
           },
         ]}
@@ -312,31 +332,43 @@ export default function AppManagerTabScreen() {
           </View>
 
           <View style={styles.appInfo}>
-            <Text style={[styles.appName, { color: isLight ? '#0F172A' : '#F0F2F8' }]} numberOfLines={1}>
-              {item.name}
-            </Text>
-            <Text style={[styles.appBundle, { color: isLight ? '#64748B' : 'rgba(240, 242, 248, 0.5)' }]} numberOfLines={1}>
+            <View style={styles.nameRow}>
+              <Text style={[styles.appName, { color: isLight ? '#0F172A' : '#F0F2F8' }]} numberOfLines={1}>
+                {item.name}
+              </Text>
+              {item.version ? (
+                <View style={[styles.versionPill, { backgroundColor: isLight ? '#EEF2F6' : 'rgba(255,255,255,0.06)' }]}>
+                  <Text style={[styles.appVersion, { color: isLight ? '#64748B' : '#94A3B8' }]}>
+                    v{item.version}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+
+            <Text style={[styles.appBundle, { color: isLight ? '#0052FF' : '#00F0FF' }]} numberOfLines={1}>
               {item.bundleId}
             </Text>
-            {item.version ? (
-              <Text style={[styles.appVersion, { color: isLight ? '#94A3B8' : 'rgba(240, 242, 248, 0.35)' }]}>
-                v{item.version}
+
+            <View style={styles.statusRow}>
+              <View style={styles.miniDot} />
+              <Text style={[styles.statusLabel, { color: isLight ? '#10B981' : '#34D399' }]}>
+                {item.containerPath ? 'Container Active' : 'Application Bundle'}
               </Text>
-            ) : null}
+            </View>
           </View>
 
           <TouchableOpacity
             style={[styles.launchBtn, { backgroundColor: isLight ? '#F1F5F9' : 'rgba(255,255,255,0.06)' }]}
             onPress={() => handleLaunchApp(item)}
           >
-            <Play size={14} color={isLight ? '#0052FF' : '#00F0FF'} />
+            <Play size={15} color={isLight ? '#0052FF' : '#00F0FF'} fill={isLight ? '#0052FF' : '#00F0FF'} />
           </TouchableOpacity>
         </TouchableOpacity>
 
         {/* Action Row */}
-        <View style={[styles.cardActionRow, { borderTopColor: isLight ? '#F1F5F9' : 'rgba(255,255,255,0.04)' }]}>
+        <View style={[styles.cardActionRow, { borderTopColor: isLight ? '#F1F5F9' : 'rgba(255,255,255,0.05)' }]}>
           <TouchableOpacity
-            style={[styles.miniActionBtn, { backgroundColor: isLight ? 'rgba(0,82,255,0.08)' : 'rgba(0,240,255,0.1)' }]}
+            style={[styles.miniActionBtn, { backgroundColor: isLight ? 'rgba(0,82,255,0.06)' : 'rgba(0,240,255,0.08)' }]}
             onPress={() => handleOpenBrowser(item)}
           >
             <FolderTree size={14} color={isLight ? '#0052FF' : '#00F0FF'} />
@@ -344,7 +376,7 @@ export default function AppManagerTabScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.miniActionBtn, { backgroundColor: isLight ? 'rgba(245,158,11,0.08)' : 'rgba(245,158,11,0.12)' }]}
+            style={[styles.miniActionBtn, { backgroundColor: isLight ? 'rgba(245,158,11,0.06)' : 'rgba(245,158,11,0.1)' }]}
             onPress={() => handleInjectModFile(item)}
           >
             <Sparkles size={14} color="#F59E0B" />
@@ -352,7 +384,7 @@ export default function AppManagerTabScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.miniActionBtn, { backgroundColor: isLight ? 'rgba(16,185,129,0.08)' : 'rgba(16,185,129,0.12)' }]}
+            style={[styles.miniActionBtn, { backgroundColor: isLight ? 'rgba(16,185,129,0.06)' : 'rgba(16,185,129,0.1)' }]}
             onPress={() => handleBackupContainer(item)}
             disabled={isBackingUp}
           >
@@ -367,7 +399,7 @@ export default function AppManagerTabScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.miniActionBtn, { backgroundColor: isLight ? 'rgba(244,63,94,0.08)' : 'rgba(244,63,94,0.12)' }]}
+            style={[styles.miniActionBtn, { backgroundColor: isLight ? 'rgba(244,63,94,0.06)' : 'rgba(244,63,94,0.1)' }]}
             onPress={() => handleCleanCache(item)}
             disabled={isCleaning}
           >
@@ -387,10 +419,10 @@ export default function AppManagerTabScreen() {
 
   return (
     <TabTransition tabPath="/mmo">
-      <View style={[styles.container, { backgroundColor: isLight ? '#F8FAFC' : '#040711' }]}>
+      <View style={[styles.container, { backgroundColor: isLight ? '#F8FAFC' : '#030712' }]}>
         {/* Header Bar */}
         <LinearGradient
-          colors={isLight ? ['#FFFFFF', '#F1F5F9'] : ['#0B1120', '#040711']}
+          colors={isLight ? ['#FFFFFF', '#F1F5F9'] : ['#0B1120', '#030712']}
           style={styles.header}
         >
           <View style={styles.headerTop}>
@@ -401,7 +433,7 @@ export default function AppManagerTabScreen() {
               <View style={styles.badgeRow}>
                 <View style={styles.activeDot} />
                 <Text style={[styles.headerSubtitle, { color: isLight ? '#0052FF' : '#00F0FF' }]}>
-                  Filza Super Tools • Sandbox Bypass OK
+                  Bypass Sandbox • LaunchServices OK
                 </Text>
               </View>
             </View>
@@ -471,6 +503,73 @@ export default function AppManagerTabScreen() {
               </TouchableOpacity>
             ) : null}
           </View>
+
+          {/* Category Filter Pills */}
+          <View style={styles.categoryRow}>
+            <TouchableOpacity
+              style={[
+                styles.categoryPill,
+                category === 'all' && styles.categoryPillActive,
+                { backgroundColor: category === 'all' ? '#00F0FF' : isLight ? '#FFFFFF' : 'rgba(255,255,255,0.04)' },
+              ]}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setCategory('all');
+              }}
+            >
+              <Text style={[styles.categoryText, { color: category === 'all' ? '#000' : isLight ? '#475569' : '#94A3B8' }]}>
+                Tất cả ({apps.length})
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.categoryPill,
+                category === 'user' && styles.categoryPillActive,
+                { backgroundColor: category === 'user' ? '#00F0FF' : isLight ? '#FFFFFF' : 'rgba(255,255,255,0.04)' },
+              ]}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setCategory('user');
+              }}
+            >
+              <Text style={[styles.categoryText, { color: category === 'user' ? '#000' : isLight ? '#475569' : '#94A3B8' }]}>
+                Người dùng
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.categoryPill,
+                category === 'games' && styles.categoryPillActive,
+                { backgroundColor: category === 'games' ? '#00F0FF' : isLight ? '#FFFFFF' : 'rgba(255,255,255,0.04)' },
+              ]}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setCategory('games');
+              }}
+            >
+              <Text style={[styles.categoryText, { color: category === 'games' ? '#000' : isLight ? '#475569' : '#94A3B8' }]}>
+                Game & Mod
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.categoryPill,
+                category === 'system' && styles.categoryPillActive,
+                { backgroundColor: category === 'system' ? '#00F0FF' : isLight ? '#FFFFFF' : 'rgba(255,255,255,0.04)' },
+              ]}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setCategory('system');
+              }}
+            >
+              <Text style={[styles.categoryText, { color: category === 'system' ? '#000' : isLight ? '#475569' : '#94A3B8' }]}>
+                Hệ thống
+              </Text>
+            </TouchableOpacity>
+          </View>
         </LinearGradient>
 
         {/* Main List */}
@@ -478,7 +577,7 @@ export default function AppManagerTabScreen() {
           <View style={styles.centerBox}>
             <ActivityIndicator size="large" color={isLight ? '#0052FF' : '#00F0FF'} />
             <Text style={[styles.loadingText, { color: isLight ? '#64748B' : 'rgba(240,242,248,0.5)' }]}>
-              Đang phân giải container ứng dụng...
+              Đang phân giải ứng dụng và container...
             </Text>
           </View>
         ) : (
@@ -496,7 +595,7 @@ export default function AppManagerTabScreen() {
                   {searchText ? 'Không tìm thấy ứng dụng phù hợp' : 'Chưa quét thấy container nào'}
                 </Text>
                 <Text style={[styles.emptySubtitle, { color: isLight ? '#64748B' : 'rgba(240,242,248,0.45)' }]}>
-                  Nhấn nút làm mới ở góc phải để thử quét lại.
+                  Nhấn nút làm mới ở góc phải để quét lại.
                 </Text>
               </View>
             }
@@ -528,14 +627,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    letterSpacing: 0.2,
+    fontSize: 21,
+    fontWeight: '900',
+    letterSpacing: -0.3,
   },
   badgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 4,
+    marginTop: 3,
     gap: 6,
   },
   activeDot: {
@@ -545,8 +644,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#10B981',
   },
   headerSubtitle: {
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.2,
   },
   refreshBtn: {
     width: 38,
@@ -569,7 +669,7 @@ const styles = StyleSheet.create({
   },
   statValue: {
     fontSize: 15,
-    fontWeight: '800',
+    fontWeight: '900',
     marginTop: 2,
   },
   statLabel: {
@@ -588,7 +688,7 @@ const styles = StyleSheet.create({
   },
   cleanAllText: {
     color: '#000',
-    fontWeight: '800',
+    fontWeight: '900',
     fontSize: 13,
   },
   searchBox: {
@@ -598,11 +698,28 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     paddingHorizontal: 12,
+    marginBottom: 10,
   },
   searchInput: {
     flex: 1,
     marginLeft: 8,
-    fontSize: 14,
+    fontSize: 13,
+  },
+  categoryRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  categoryPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+  },
+  categoryPillActive: {
+    backgroundColor: '#00F0FF',
+  },
+  categoryText: {
+    fontSize: 12,
+    fontWeight: '700',
   },
   listContent: {
     padding: 16,
@@ -628,38 +745,67 @@ const styles = StyleSheet.create({
     marginRight: 14,
   },
   appIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
+    width: 50,
+    height: 50,
+    borderRadius: 14,
   },
   appIconFallback: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
+    width: 50,
+    height: 50,
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
   },
   appInfo: {
     flex: 1,
   },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 2,
+  },
   appName: {
     fontSize: 15,
+    fontWeight: '800',
+    flexShrink: 1,
+  },
+  versionPill: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  appVersion: {
+    fontSize: 10,
     fontWeight: '700',
-    marginBottom: 2,
   },
   appBundle: {
     fontSize: 12,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    marginBottom: 3,
   },
-  appVersion: {
-    fontSize: 11,
-    marginTop: 2,
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  miniDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: '#10B981',
+  },
+  statusLabel: {
+    fontSize: 10,
+    fontWeight: '700',
   },
   launchBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
+    width: 36,
+    height: 36,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
+    marginLeft: 6,
   },
   cardActionRow: {
     flexDirection: 'row',
@@ -678,7 +824,7 @@ const styles = StyleSheet.create({
   },
   miniActionText: {
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: '800',
   },
   centerBox: {
     flex: 1,
@@ -690,10 +836,11 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 13,
+    fontWeight: '600',
   },
   emptyTitle: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '800',
     marginTop: 16,
     textAlign: 'center',
   },

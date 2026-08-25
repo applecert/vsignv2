@@ -35,10 +35,12 @@ import {
 } from 'lucide-react-native';
 import * as Notifications from 'expo-notifications';
 import * as Linking from 'expo-linking';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { auth, db } from '../firebaseConfig';
 import { doc, setDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import Constants from 'expo-constants';
+import { OnboardingModal } from '../components/ui/OnboardingModal';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
@@ -245,25 +247,13 @@ function GlassCard({
   );
 }
 
-/* ================================================================
-   MAIN LAYOUT
-   ================================================================ */
 export default function RootLayout() {
   const pathname = usePathname();
 
-  /* ─── Splash Animations ─── */
-  const logoScale = useRef(new Animated.Value(0.85)).current;
-  const logoOpacity = useRef(new Animated.Value(0)).current;
-  const textOpacity = useRef(new Animated.Value(0)).current;
-  const textTranslateY = useRef(new Animated.Value(20)).current;
-  const authorOpacity = useRef(new Animated.Value(0)).current;
-  const screenScale = useRef(new Animated.Value(1)).current;
-  const screenOpacity = useRef(new Animated.Value(1)).current;
-  const [showIntro, setShowIntro] = useState(true);
-
-  /* ─── App State ─── */
-  const [permissionGranted, setPermissionGranted] = useState<boolean | null>(null);
-  const [isCheckingPermission, setIsCheckingPermission] = useState(true);
+  /* ─── Onboarding & App State ─── */
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [permissionGranted, setPermissionGranted] = useState<boolean | null>(true);
+  const [isCheckingPermission, setIsCheckingPermission] = useState(false);
   const [userSkippedUpdate, setUserSkippedUpdate] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [forceUpdateConfig, setForceUpdateConfig] = useState<{
@@ -412,65 +402,13 @@ export default function RootLayout() {
     };
   }, [checkNotificationPermission, checkMaintenanceFromServer]);
 
-  /* ─── Splash Animation Sequence ─── */
+  /* ─── Onboarding Check (3105 Style) ─── */
   useEffect(() => {
-    // Entrance
-    Animated.parallel([
-      Animated.timing(logoOpacity, {
-        toValue: 1,
-        duration: 1600,
-        easing: Easing.bezier(0.19, 1, 0.22, 1),
-        useNativeDriver: true,
-      }),
-      Animated.timing(logoScale, {
-        toValue: 1,
-        duration: 1800,
-        easing: Easing.bezier(0.19, 1, 0.22, 1),
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      // Slogan & credits
-      Animated.parallel([
-        Animated.timing(textOpacity, {
-          toValue: 1,
-          duration: 800,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-        Animated.timing(textTranslateY, {
-          toValue: 0,
-          duration: 800,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-        Animated.timing(authorOpacity, {
-          toValue: 1,
-          duration: 800,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-      ]).start();
+    AsyncStorage.getItem('@has_completed_onboarding_v2').then((val) => {
+      if (!val) {
+        setShowOnboarding(true);
+      }
     });
-
-    // Exit after 3.8s
-    const timer = setTimeout(() => {
-      Animated.parallel([
-        Animated.timing(screenOpacity, {
-          toValue: 0,
-          duration: 700,
-          easing: Easing.bezier(0.25, 0.1, 0.25, 1),
-          useNativeDriver: true,
-        }),
-        Animated.timing(screenScale, {
-          toValue: 1.12,
-          duration: 700,
-          easing: Easing.bezier(0.25, 0.1, 0.25, 1),
-          useNativeDriver: true,
-        }),
-      ]).start(() => setShowIntro(false));
-    }, 3800);
-
-    return () => clearTimeout(timer);
   }, []);
 
   /* ─── Derived States ─── */
@@ -652,74 +590,11 @@ export default function RootLayout() {
         </ThemeProvider>
       )}
 
-      {/* ─── SPLASH SCREEN ─── */}
-      {showIntro && (
-        <Animated.View
-          style={[
-            StyleSheet.absoluteFill,
-            styles.splashContainer,
-            {
-              opacity: screenOpacity,
-              transform: [{ scale: screenScale }],
-            },
-          ]}
-        >
-          <LinearGradient
-            colors={[COLORS.void, COLORS.deep, COLORS.void]}
-            style={StyleSheet.absoluteFill}
-          />
-
-          {/* Aurora Background */}
-          <AuroraBackground />
-
-          {/* Orbital Rings */}
-          <View style={styles.orbitalContainer}>
-            <OrbitalRing size={220} duration={30000} dotColor={COLORS.cyan} />
-            <OrbitalRing size={300} duration={45000} reverse dotColor={COLORS.violet} />
-            <OrbitalRing size={380} duration={60000} dotColor={COLORS.rose} />
-            <OrbitalRing size={460} duration={80000} reverse dotColor={COLORS.amber} />
-          </View>
-
-          {/* Content */}
-          <View style={styles.splashContent}>
-            <Animated.View
-              style={[
-                styles.logoWrap,
-                {
-                  opacity: logoOpacity,
-                  transform: [{ scale: logoScale }],
-                },
-              ]}
-            >
-              <Image
-                source={require('../assets/images/vsign_logo_white.png')}
-                style={styles.logoImg}
-                resizeMode="contain"
-              />
-            </Animated.View>
-
-            <Animated.View
-              style={{
-                opacity: textOpacity,
-                transform: [{ translateY: textTranslateY }],
-                alignItems: 'center',
-                marginTop: 32,
-              }}
-            >
-              <Text style={styles.tagline}>
-                HỆ THỐNG KÝ APP NGOẠI TUYẾN CHUYÊN NGHIỆP
-              </Text>
-            </Animated.View>
-
-            <Animated.View
-              style={[styles.authorBox, { opacity: authorOpacity }]}
-            >
-              <Text style={styles.authorLabel}>PRODUCED BY</Text>
-              <Text style={styles.authorName}>IPAVIET.SITE</Text>
-            </Animated.View>
-          </View>
-        </Animated.View>
-      )}
+      {/* ─── 3105-STYLE ONBOARDING MODAL ─── */}
+      <OnboardingModal
+        visible={showOnboarding}
+        onFinish={() => setShowOnboarding(false)}
+      />
     </>
   );
 }
