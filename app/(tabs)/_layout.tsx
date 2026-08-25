@@ -7,7 +7,7 @@ import { Tabs } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
-import { House, Wrench, LayoutGrid, ShoppingCart } from 'lucide-react-native';
+import { House, Wrench, LayoutGrid, FolderTree } from 'lucide-react-native';
 
 const { width } = Dimensions.get('window');
 const TAB_BAR_WIDTH = width - 48;
@@ -37,7 +37,7 @@ const TAB_CONFIG = [
   { name: 'index', icon: House, label: 'Khám phá' },
   { name: 'sign', icon: Wrench, label: 'Ký App' },
   { name: 'apps', icon: LayoutGrid, label: 'Kho IPA' },
-  { name: 'mmo', icon: ShoppingCart, label: 'Chợ MMO' },
+  { name: 'mmo', icon: FolderTree, label: 'Quản lý App' },
 ] as const;
 
 import { useThemeUpdate, COLORS as THEME_COLORS } from '../../constants/theme';
@@ -320,7 +320,7 @@ export default function TabLayout() {
         <Tabs.Screen name="index" options={{ title: 'Khám phá' }} />
         <Tabs.Screen name="sign" options={{ title: 'Ký App' }} />
         <Tabs.Screen name="apps" options={{ title: 'Kho IPA' }} />
-        <Tabs.Screen name="mmo" options={{ title: 'Chợ MMO' }} />
+        <Tabs.Screen name="mmo" options={{ title: 'Quản lý App' }} />
       </Tabs>
     </>
   );
