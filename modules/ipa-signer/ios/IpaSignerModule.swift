@@ -199,5 +199,83 @@ public class IpaSignerModule: Module {
         }
       }
     }
+
+    // MARK: - App Data & Container Management (3105 Integration)
+
+    AsyncFunction("getInstalledAppContainers") { (promise: Promise) in
+      DispatchQueue.global(qos: .userInitiated).async {
+        let apps = ContainerBridge.getInstalledApps()
+        DispatchQueue.main.async {
+          promise.resolve(apps)
+        }
+      }
+    }
+
+    AsyncFunction("listContainerFiles") { (path: String, promise: Promise) in
+      let clean = cleanPath(path)
+      DispatchQueue.global(qos: .userInitiated).async {
+        let files = ContainerBridge.listDirectory(at: clean)
+        DispatchQueue.main.async {
+          promise.resolve(files)
+        }
+      }
+    }
+
+    AsyncFunction("readContainerFile") { (path: String, promise: Promise) in
+      let clean = cleanPath(path)
+      DispatchQueue.global(qos: .userInitiated).async {
+        if let result = ContainerBridge.readFile(at: clean) {
+          DispatchQueue.main.async {
+            promise.resolve([
+              "content": result.content,
+              "isBinary": result.isBinary
+            ])
+          }
+        } else {
+          DispatchQueue.main.async {
+            promise.reject("READ_ERROR", "Không thể đọc file: \(clean)")
+          }
+        }
+      }
+    }
+
+    AsyncFunction("writeContainerFile") { (path: String, content: String, isBase64: Bool, promise: Promise) in
+      let clean = cleanPath(path)
+      DispatchQueue.global(qos: .userInitiated).async {
+        let success = ContainerBridge.writeFile(at: clean, content: content, isBase64: isBase64)
+        DispatchQueue.main.async {
+          if success {
+            promise.resolve(true)
+          } else {
+            promise.reject("WRITE_ERROR", "Không thể ghi file: \(clean)")
+          }
+        }
+      }
+    }
+
+    AsyncFunction("deleteContainerItem") { (path: String, promise: Promise) in
+      let clean = cleanPath(path)
+      DispatchQueue.global(qos: .userInitiated).async {
+        let success = ContainerBridge.deleteItem(at: clean)
+        DispatchQueue.main.async {
+          promise.resolve(success)
+        }
+      }
+    }
+
+    AsyncFunction("cleanContainerCache") { (containerPath: String, promise: Promise) in
+      let clean = cleanPath(containerPath)
+      DispatchQueue.global(qos: .userInitiated).async {
+        let freedBytes = ContainerBridge.cleanAppCache(containerPath: clean)
+        DispatchQueue.main.async {
+          promise.resolve(freedBytes)
+        }
+      }
+    }
+
+    AsyncFunction("openInstalledApp") { (bundleId: String, promise: Promise) in
+      let result = openApplicationForBundleID(bundleId as NSString)
+      promise.resolve(result)
+    }
   }
 }

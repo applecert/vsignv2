@@ -20,7 +20,7 @@ const IpaSigner = (() => {
   }
 })();
 
-import { FileArchive, Share, Trash2, FolderOpen, Layers, Wrench, X, FileKey, CheckCircle2, Rocket, PlusCircle, ShieldCheck, MoreVertical, Sliders, ChevronDown, ImagePlus, ArrowLeft } from 'lucide-react-native';
+import { FileArchive, Share, Trash2, FolderOpen, Layers, Wrench, X, FileKey, CheckCircle2, Rocket, PlusCircle, ShieldCheck, MoreVertical, Sliders, ChevronDown, ImagePlus, ArrowLeft, Folder } from 'lucide-react-native';
 import { COLORS, useThemeUpdate, TXT } from '../../constants/theme';
 import { TabTransition } from '../../components/ui/TabTransition';
 import { startStaticServer } from '../../utils/staticServer';
@@ -885,6 +885,11 @@ export default function SignScreen() {
             <TouchableOpacity style={styles.menuItem} onPress={importIpaFile}>
               <PlusCircle color={COLORS.primary} size={22} />
               <Text style={[styles.menuText, { color: COLORS.text }]}>{TXT.addIpa}</Text>
+            </TouchableOpacity>
+            <View style={{height: 1, backgroundColor: COLORS.border}} />
+            <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuVisible(false); router.push('/app-manager'); }}>
+              <Folder color="#00F0FF" size={22} />
+              <Text style={[styles.menuText, { color: COLORS.text }]}>Quản lý App & Filza</Text>
             </TouchableOpacity>
             <View style={{height: 1, backgroundColor: COLORS.border}} />
             <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuVisible(false); router.push('/settings'); }}>

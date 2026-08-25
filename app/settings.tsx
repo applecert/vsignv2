@@ -14,7 +14,7 @@ import JSZip from 'jszip';
 import { 
   Palette, Languages, ShieldCheck, FileKey, Trash2, PlusCircle, 
   CheckCircle2, X, RefreshCw, Info, ChevronRight, ChevronLeft, Award, HardDrive,
-  Scissors, Bell, Zap
+  Scissors, Bell, Zap, Folder
 } from 'lucide-react-native';
 
 import { COLORS, SIZES, SHADOWS, useThemeUpdate, notifyThemeChange, loadTheme, loadLanguage, THEME_STYLES, TRANSLATIONS, TXT, loadFpsMode, saveFpsMode, FpsMode } from '../constants/theme';
@@ -841,6 +841,35 @@ export default function SettingsScreen() {
             </View>
           </View>
           {fpsMode === '60fps' && <CheckCircle2 color={COLORS.primary} size={18} />}
+        </TouchableOpacity>
+      </View>
+
+      {/* SECTION: QUẢN LÝ APP & DỮ LIỆU (FILZA TOOL) */}
+      <View style={styles.sectionHeader}>
+        <Text style={[styles.sectionTitle, { color: COLORS.textMuted }]}>CÔNG CỤ HỆ THỐNG & FILZA</Text>
+      </View>
+
+      <View style={[styles.cardGroup, { backgroundColor: COLORS.surfaceCard, borderColor: COLORS.border }]}>
+        <TouchableOpacity
+          style={styles.rowItem}
+          activeOpacity={0.8}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            router.push('/app-manager');
+          }}
+        >
+          <View style={styles.rowLabelContainer}>
+            <Folder color={COLORS.primary} size={18} strokeWidth={2.2} />
+            <View style={{ marginLeft: 4 }}>
+              <Text style={[styles.rowLabel, { color: COLORS.text, fontWeight: '700' }]}>
+                📁 Quản lý App & Dữ liệu (Filza Explorer)
+              </Text>
+              <Text style={{ fontSize: 12, color: COLORS.textMuted, marginTop: 2 }}>
+                Duyệt file Documents, Library, Mod save game & Dọn rác
+              </Text>
+            </View>
+          </View>
+          <ChevronRight color={COLORS.textMuted} size={18} />
         </TouchableOpacity>
       </View>
 

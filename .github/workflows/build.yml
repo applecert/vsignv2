@@ -1,5 +1,9 @@
 name: Build Unsigned IPA Expo
 on:
+  push:
+    branches:
+      - main
+      - master
   workflow_dispatch:
 
 jobs:
@@ -117,7 +121,7 @@ jobs:
               with open(u_file, 'w') as f:
                   for line in lines:
                       if line.startswith('#import \"') or line.startswith('#import <IpaSigner/'):
-                          if 'IpaSignerModule' in line or 'IpaSignerView' in line or 'ZSignWrapper' in line or 'Expo' in line:
+                          if 'IpaSignerModule' in line or 'IpaSignerView' in line or 'ZSignWrapper' in line or 'Expo' in line or 'bad_query' in line or 'mcm_bridge' in line or 'AppIconHelper' in line:
                               f.write(line)
                       else:
                           f.write(line)
