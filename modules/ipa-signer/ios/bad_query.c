@@ -27,7 +27,7 @@ typedef int (*sandbox_extension_release_fn)(int64_t);
 
 #define BAD_QUERY_ERR(fmt, ...) fprintf(stderr, "[bad_query] " fmt "\n", ##__VA_ARGS__)
 
-int64_t bad_query(char* path, bool create, char *group_identifier, bool is_group) {
+int64_t bad_query(const char* path, bool create, const char *group_identifier, bool is_group) {
     if (!path || path[0] != '/') return -255;
     if (!create) {
         struct stat st;
@@ -146,7 +146,7 @@ void bad_query_release(int64_t handle) {
     if (release_extension) release_extension(handle);
 }
 
-char *bad_query_list(char *path, int64_t max_inode) {
+char *bad_query_list(const char *path, int64_t max_inode) {
     struct statfs sfs;
     if (statfs(path, &sfs) != 0) return NULL;
     fsid_t fsid = sfs.f_fsid;
